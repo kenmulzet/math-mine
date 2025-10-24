@@ -1,0 +1,21 @@
+{
+    "linear_equations": generate_linear_equation,
+    "quadratic_equations": generate_quadratic_equation,
+    "quadratic_factors": generate_factor_quadratic,
+    "circle_area": generate_circle_area_problem,
+    "circle_circumference": generate_circumference_problem,
+    "square_area": generate_square_area_problem,
+    "square_perimeter": generate_square_perimeter_problem,
+    "triangle_area": generate_triangle_area_problem,
+    "cube_volume": generate_cube_volume_problem,
+    "cube_surface_area": generate_cube_surface_area_problem,
+    "cylinder_volume": generate_cylinder_volume_problem,
+    "cylinder_surface_area": generate_cylinder_surface_area_problem,
+    "sphere_volume": generate_sphere_volume_problem,
+    "indefinite_integrals": generate_indefinite_integral,
+    "definite_integrals": generate_definite_integral,
+    "polynomial_derivative": generate_polynomial_derivative,
+    "exponential_derivative": generate_exponential_derivative,
+    "exponential_antiderivative": generate_exponential_antiderivative,
+    "trig_derivative": generate_trig_derivative
+}
