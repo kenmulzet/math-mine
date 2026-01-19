@@ -13,16 +13,19 @@ def compile_latex_to_pdf(tex_file):
     except subprocess.CalledProcessError as e:
         print(f"❌ LaTeX compilation failed: {e}")
 
-def export_to_latex(problems, include_answers, subject):
+def export_to_latex(problems, include_answers, subject, name_date = False, title = ""):
     os.makedirs("static", exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"calculus_problems_{timestamp}.tex"
 #    filepath = os.path.join("static", os.path.basename(filename))
     filepath = os.path.join("static", filename)
 
+    if title == "":
+        title = subject + " Worksheet"
+
     header = fr"""\documentclass[12pt]{{article}}
 \usepackage{{amsmath}}
-\title{{{subject} Practice Problems}}
+\title{{{title}}}
 \begin{{document}}
 \maketitle
 \begin{{enumerate}}

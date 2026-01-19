@@ -1,8 +1,11 @@
 import os
+import copy
+import zipfile
 import traceback
+from typing import Optional;
 from datetime import datetime
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fpdf import FPDF
@@ -18,7 +21,7 @@ app = FastAPI()
 # Allow frontend to talk to backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],  # You can restrict this later
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "http://localhost:3000", "http://127.0.0.1:3000"],  # You can restrict this later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,12 +44,35 @@ def get_map(map_name: str):
     except FileNotFoundError:
         return JSONResponse(content={"error": "Map not found"}, status_code=404)
 
+@app.get("/download_all")
+def download_all(
+        pdf_filename: str = Query(...), 
+        answer_filename: str = Query(...)
+):
+    ws_pdf = os.path.join("static", pdf_filename)
+    ans_pdf = os.path.join("static", answer_filename)
+
+    print(f"ws_pdf = ", ws_pdf)
+    if not os.path.exists(ws_pdf) or not os.path.exists(ans_pdf):
+        raise HTTPException(status_code=404, detail="Files not found")
+
+    zip_filename = "bundle.zip"
+    zip_path = os.path.join("static", zip_filename)
+
+    with zipfile.ZipFile(zip_path, "w") as zipf:
+        zipf.write(ws_pdf, arcname=os.path.basename(ws_pdf))
+        zipf.write(ans_pdf, arcname=os.path.basename(ans_pdf))
+
+    return FileResponse(zip_path, filename=zip_filename)
+
 # 🔧 Utility function: HTML exporter
-def export_to_html(problems, include_answers=True, category="Algebra"):
+def export_to_html(problems, category="Algebra", title=""):
     os.makedirs("static", exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"math_problems_{timestamp}.html"
     filepath = os.path.join("static", filename)
+    if title == "":
+        title = category + " Worksheet"
 
     html = f"""
     <!DOCTYPE html>
@@ -63,14 +89,12 @@ def export_to_html(problems, include_answers=True, category="Algebra"):
         </style>
     </head>
     <body>
-        <h2>{category} Practice Worksheet</h2>
+        <h2>{title}</h2>
         <ol>
     """
 
     for q, a in problems:
         html += f"<li>{q}"
-        if include_answers:
-            html += f"<br><span class='answer'>Answer:</span> {a}"
         html += "</li>"
 
     html += """
@@ -84,7 +108,7 @@ def export_to_html(problems, include_answers=True, category="Algebra"):
 
     return html, filename
 
-def export_latex_to_html(calc_problems, include_answers=True, problem_type = "calculus"):
+def export_latex_to_html(calc_problems, problem_type = "calculus", title = ""):
     os.makedirs("static", exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{problem_type}_problems_{timestamp}.html"
@@ -92,11 +116,14 @@ def export_latex_to_html(calc_problems, include_answers=True, problem_type = "ca
 
     html_body = ""
     for question, answer in calc_problems:
-        print(f"question: {question}")
-        print(f"answer: {answer}")
+#        print(f"question: {question}")
+#        print(f"answer: {answer}")
+        if f"$a_1 = " in question:
+            question = question.replace(f"$a_n$", f"a<sub>n</sub>")
+            question = question.replace(f"$a_1 = ", f"a<sub>1</sub> = ")
+            question = question.replace(f"a_2 = ", f"a<sub>2</sub> = ")
+            question = question.replace(f"$, and", ", and")
         html_body += f"<li>{question}"
-        if include_answers:
-            html_body += f"<br><span class='answer'>Answer:</span> {answer}"
         html_body += "</li>"
 
     html = f"""
@@ -114,6 +141,7 @@ def export_latex_to_html(calc_problems, include_answers=True, problem_type = "ca
       </style>
     </head>
     <body>
+      <h2 style="text-align:center;">{title}</h2>
       <ol>{html_body}</ol>
     </body>
     </html>
@@ -124,32 +152,68 @@ def export_latex_to_html(calc_problems, include_answers=True, problem_type = "ca
 
     return html, filename
 
-def export_to_pdf(text_lines: list[str], subject) -> str:
+def export_to_pdf(text_lines: list[str], subject, name_date=False, title=""):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Worksheet filename
     filename = f"{subject}_ws_{timestamp}.pdf"
     filepath = os.path.join("static", filename)
+
+    # Answer key filename
+    answers_filename = f"{subject}_answers_{timestamp}.pdf"
+    answers_filepath = os.path.join("static", answers_filename)
+
+    # --- Worksheet PDF ---
     pdf = FPDF()
     pdf.add_page()
-    
-    # Format title based on subject
-    title = f"{subject.capitalize()} Worksheet"
 
-    # Title styling
+    # Title
+    if title == "":
+        title = f"{subject.capitalize()} Worksheet"
     pdf.set_font("Arial", style="B", size=16)
     pdf.cell(200, 10, txt=title, ln=True, align="C")
     pdf.ln(5)
 
-    # Problem list
+    # Optional name/date line (worksheet only)
+    if name_date:
+        pdf.set_font("Arial", size=12)
+        pdf.cell(
+            200,
+            10,
+            txt="Name ____________________    Date ____________________",
+            ln=True,
+            align="C",
+        )
+        pdf.ln(5)
+
+    # Problems
     pdf.set_font("Arial", size=12)
     for i, line in enumerate(text_lines, start=1):
         prob = line[0] if isinstance(line, (list, tuple)) else line
         pdf.multi_cell(0, 10, txt=f"{i}. {prob}")
 
-    try:
-        pdf.output(filepath)
-        return filepath
-    except Exception as e:
-        raise RuntimeError(f"PDF export failed: {e}")
+    pdf.output(filepath)
+
+    # --- Answer Key PDF ---
+    pdf_ans = FPDF()
+    pdf_ans.add_page()
+    pdf_ans.set_font("Arial", style="B", size=16)
+    pdf_ans.cell(200, 10, txt=f"{subject.capitalize()} Answer Key", ln=True, align="C")
+    pdf_ans.ln(5)
+
+    pdf_ans.set_font("Arial", size=12)
+    for i, line in enumerate(text_lines, start=1):
+        # If text_lines are tuples like (problem, answer), use the answer
+        if isinstance(line, (list, tuple)) and len(line) > 1:
+            ans = line[1]
+        else:
+            ans = "N/A"
+        pdf_ans.multi_cell(0, 10, txt=f"{i}. {ans}")
+
+    pdf_ans.output(answers_filepath)
+
+    return filename, answers_filename
+
 
 @app.route("/")
 def index():
@@ -189,11 +253,10 @@ generator_map.update(diffeq_map)
 print(f"diffeq_keys = {diffeq_keys}")
 
 # ✅ Shared logic
-def generate_problems_from_data(problem_data: dict, include_answers: bool):
+def generate_problems_from_data(problem_data: dict):
     problems = []
     for problem_type, count in problem_data.items():
         generator = generator_map.get(problem_type)
-        print(f"generator = {generator}")
         if not generator:
             print(f"Unknown problem type: {problem_type}")
             continue
@@ -207,7 +270,15 @@ async def generate_worksheet(request: Request):
     try:
         # Parse incoming JSON
         problem_data = await request.json()
-        include_answers = problem_data.pop("include_answers", False)
+        print(problem_data)
+
+        # Optional flags (already snake_case)
+        include_name_date = problem_data.pop("include_name_date", False)
+        change_title      = problem_data.pop("change_title", False)
+        title             = problem_data.pop("title", "")
+        print(f"include_name_date = ", include_name_date)
+        print(f"change_title = ", change_title)
+        print(f"title = ", title)
 
         for key in problem_data:
             problem_type = key
@@ -221,19 +292,31 @@ async def generate_worksheet(request: Request):
             "Math"
         )
 
+        print(f"subject = ", subject)
         # Generate problems and export to HTML
-        problems = generate_problems_from_data(problem_data, include_answers)
+        problems = generate_problems_from_data(problem_data)
+        print("generated problems")
         if (subject == "Calculus") or (subject == "Differential Equations"):
-            PDF_filename = export_to_latex(problems, include_answers, subject)
-            html, HTML_filename = export_latex_to_html(problems, include_answers, subject)
-            print(f"PDF_filename = {PDF_filename}")
-            print(f"HTML_filename = {HTML_filename}")
+            # deep copy so nested dicts inside problems are duplicated
+            problems_for_pdf = copy.deepcopy(problems)
+            problems_for_html = copy.deepcopy(problems)
+
+            PDF_filename, Answer_key_filename = export_to_latex(problems_for_pdf, subject, include_name_date, title)
+            html, HTML_filename = export_latex_to_html(problems_for_html, subject, title)
         else:
-            html, HTML_filename = export_to_html(problems, include_answers, subject)
-            PDF_filename = export_to_pdf(problems, subject)
+            html, HTML_filename = export_to_html(problems, subject, title)
+            PDF_filename, Answer_key_filename = export_to_pdf(problems, subject, include_name_date, title)
+
+        print(f"PDF_filename = {PDF_filename}")
+        print(f"HTML_filename = {HTML_filename}")
+        print(f"Answer_key_filename = {Answer_key_filename}")
 
         # Return both HTML and filename to frontend
-        return JSONResponse(content={"html": html, "HTML_filename": HTML_filename, "PDF_filename": PDF_filename})
+        return JSONResponse(content={
+            "html": html, 
+            "HTML_filename": HTML_filename, 
+            "PDF_filename": PDF_filename, 
+            "Answer_key_filename": Answer_key_filename})
 
     except Exception as e:
         print(f"[ERROR] /generate failed: {e}\n{traceback.format_exc()}")

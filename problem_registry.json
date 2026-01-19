@@ -17,5 +17,8 @@
     "polynomial_derivative": generate_polynomial_derivative,
     "exponential_derivative": generate_exponential_derivative,
     "exponential_antiderivative": generate_exponential_antiderivative,
-    "trig_derivative": generate_trig_derivative
+    "trig_derivative": generate_trig_derivative,
+    "difference_equations": generate_difference_eqn,
+    "second_order_differential_equations": generate_second_order_eqn,
+    "bernoulli_equations": generate_bernoulli_eqn
 }

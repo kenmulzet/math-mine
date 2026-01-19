@@ -28,17 +28,38 @@
 
       <div class="mb-3">
         <label class="form-label">Include Answers</label><br>
-        <input type="radio" name="include_answers" value="text" checked> Yes
-        <input type="radio" name="include_answers" value="latex"> No
+        <input type="radio" name="include_answers" value="true"> Yes
+        <input type="radio" name="include_answers" value="false" checked> No
       </div> 
 
       <button type="submit" class="btn btn-primary">Excavate</button>
 
-      <button id="reset-btn" class="btn btn-primary">Reset</button>
+      <button id="reset-btn" type="button" class="btn btn-primary">Reset</button>
     </form>
 
     <div id="outputDiv" class="border p-3 bg-white"></div>
+
+    <button id="histogram-btn" type="button" class="btn btn-secondary mt-3" style="display:none;">
+      📊 Show Histogram
+    </button>
+
+    <div class="row">
+      <div class="col-md-6 mx-auto text-center">
+        <button id="histogram-btn" type="button" class="btn btn-secondary mt-3" style="display:none;">
+          📊 Show Histogram
+        </button>
+
+        <div id="histogram-card" class="card mt-4" style="display:none;">
+          <div class="card-body">
+            <canvas id="histogramCanvas"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
@@ -46,39 +67,73 @@
     const topicSelector = document.getElementById("topic");
     const problemTypesContainer = document.getElementById("problemTypes");
 
-async function loadProblemTypes(mapNames) {
-  const problemTypes = {};
+    const histogramBtn = document.getElementById("histogram-btn");
+    const ctx = document.getElementById("histogramCanvas").getContext("2d");
+    let histogramChart = null;
 
-  for (const mapName of mapNames) {
-    try {
-      const response = await fetch(`/maps/${mapName}`);
-      if (!response.ok) throw new Error(`Failed to load ${mapName} map`);
+    histogramBtn.addEventListener("click", () => {
+      if (!window.lastProblemData) {
+        alert("⚠️ Please generate a worksheet first.");
+        return;
+      }
 
-      const data = await response.json();
+      const labels = Object.keys(window.lastProblemData);
+      const values = Object.values(window.lastProblemData);
 
-      // Transform backend-style JSON into frontend array format
-      problemTypes[mapName] = Object.entries(data).map(([key, value]) => ({
-        label: value.label,
-        key: key
-      }));
-    } catch (error) {
-      console.error(`Error loading ${mapName} map:`, error);
-      problemTypes[mapName] = []; // fallback to empty array
-    }
-  }
+      if (histogramChart) {
+        histogramChart.destroy();
+      }
 
-  return problemTypes;
-}
-
-    const mapNames = ["algebra", "geometry", "calculus", "diffeq"];
-    let problemTypes = {}; // Declare in outer scope
-
-    loadProblemTypes(mapNames).then(loadedTypes => {
-      problemTypes = loadedTypes; // update the outer scoped variable
-      console.log("Loaded problemTypes:", problemTypes);
+      histogramChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [{
+            label: "Problem Counts",
+            data: values,
+            backgroundColor: "rgba(54, 162, 235, 0.6)"
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            title: { display: true, text: "Problems per Type" }
+          }
+        }
+      });
     });
 
-    console.log(problemTypes)
+    async function loadProblemTypes(mapNames) {
+      const problemTypes = {};
+
+      for (const mapName of mapNames) {
+        try {
+          const response = await fetch(`/maps/${mapName}`);
+          if (!response.ok) throw new Error(`Failed to load ${mapName} map`);
+
+          const data = await response.json();
+
+          problemTypes[mapName] = Object.entries(data).map(([key, value]) => ({
+            label: value.label,
+            key: key
+          }));
+        } catch (error) {
+          console.error(`Error loading ${mapName} map:`, error);
+          problemTypes[mapName] = [];
+        }
+      }
+
+      return problemTypes;
+    }
+
+    const mapNames = ["algebra", "geometry", "calculus", "diffeq"];
+    let problemTypes = {};
+
+    loadProblemTypes(mapNames).then(loadedTypes => {
+      problemTypes = loadedTypes;
+      console.log("Loaded problemTypes:", problemTypes);
+    });
 
     // 🧠 Dynamically load problem type inputs
     topicSelector.addEventListener("change", function () {
@@ -87,8 +142,8 @@ async function loadProblemTypes(mapNames) {
 
       if (problemTypes[selectedTopic]) {
         problemTypes[selectedTopic].forEach(type => {
-          const id = type.key;  // Use the backend-friendly key
-          const label = type.label;  // Use the human-readable label
+          const id = type.key;
+          const label = type.label;
 
           problemTypesContainer.innerHTML += `
             <div class="mb-2">
@@ -98,86 +153,116 @@ async function loadProblemTypes(mapNames) {
           `;
         });
       }
+
+      // ✅ Clear old links and histogram when topic changes
+      const outputDiv = document.getElementById("outputDiv");
+      outputDiv.innerHTML = "";
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+      // ✅ Hide histogram controls
+      document.getElementById("histogram-btn").style.display = "none";
+      document.getElementById("histogram-card").style.display = "none";
     });
 
     // 🚀 Handle form submission and inject HTML
-      form.addEventListener("submit", async function (e) {
-        e.preventDefault();
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
 
-        const problemData = {};
-        numProblems = 0;
-        const inputs = document.querySelectorAll("input[type='number']");
-        if (inputs.length === 0) {
-          alert("Please select a problem type before excavating.");
-          return; // stop execution
+      const includeAnswersValue = document.querySelector('input[name="include_answers"]:checked').value;
+      const includeAnswers = includeAnswersValue === "true";
+
+      const problemData = {};
+      let numProblems = 0;
+      const inputs = document.querySelectorAll("input[type='number']");
+      if (inputs.length === 0) {
+        alert("Please select a problem type before excavating.");
+        return;
+      }
+
+      inputs.forEach(input => {
+        const count = parseInt(input.value);
+        if (count > 0) {
+          const key = input.name.replace("_count", "");
+          problemData[key] = count;
+          numProblems += count;
         }
-
-        inputs.forEach(input => {
-          const count = parseInt(input.value);
-          if (count > 0) {
-            const key = input.name.replace("_count", "");
-            problemData[key] = count;
-            numProblems += count;
-          }  
-        });
-
-        if (numProblems === 0) {
-          alert("⚠️ Please select at least one problem before excavating.");
-          return;
-        }
-
-        // Optional: include answers toggle
-        const includeAnswers = document.querySelector("#includeAnswersCheckbox")?.checked;
-        problemData.include_answers = includeAnswers;
-
-        const response = await fetch("http://localhost:8000/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(problemData)
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text(); // This will show the HTML error
-          console.error("Backend error:", errorText);
-          throw new Error("Worksheet generation failed");
-        }
-
-        const data = await response.json();
-        const worksheetHTML = data.html;
-        const HTML_filename = data.HTML_filename;
-        const PDF_filename = data.PDF_filename;
-        const outputDiv = document.getElementById("outputDiv");
-        outputDiv.innerHTML = ""; // clear previous content
-
-        const link1 = document.createElement("a");
-        link1.href = `http://localhost:8000/static/${HTML_filename}`;
-        link1.textContent = "📄 View Webpage";
-        link1.target = "_blank";
-        link1.style.display = "block";
-        link1.style.marginTop = "1em";
-
-        const link2 = document.createElement("a");
-        link2.href = `http://localhost:8000/${PDF_filename}`;
-        link2.textContent = "📄 View PDF";
-        link2.target = "_blank";
-        link2.rel = "noopener noreferrer";
-
-        outputDiv.appendChild(link1);
-        outputDiv.appendChild(link2);
       });
+
+      window.lastProblemData = problemData;
+
+      if (numProblems === 0) {
+        alert("⚠️ Please select at least one problem before excavating.");
+        return;
+      }
+
+      const response = await fetch("http://localhost:8000/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(problemData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Backend error:", errorText);
+        throw new Error("Worksheet generation failed");
+      }
+
+      const data = await response.json();
+      const worksheetHTML = data.html;
+      const HTML_filename = data.HTML_filename;
+      const PDF_filename = data.PDF_filename;
+      const Answer_key_filename = data.Answer_key_filename; // ✅ semicolon added
+      const outputDiv = document.getElementById("outputDiv");
+      outputDiv.innerHTML = "";
+
+      const link1 = document.createElement("a");
+      link1.href = `http://localhost:8000/static/${HTML_filename}`;
+      link1.textContent = "📄 View Webpage";
+      link1.target = "_blank";
+      link1.style.display = "block";
+      link1.style.marginTop = "1em";
+
+      const link2 = document.createElement("a");
+      link2.href = `http://localhost:8000/static/${PDF_filename}`;
+      link2.textContent = "📄 View PDF";
+      link2.target = "_blank";
+      link2.rel = "noopener noreferrer";
+
+      outputDiv.appendChild(link1);
+      outputDiv.appendChild(link2);
+
+      if (includeAnswers && Answer_key_filename) {
+        const link3 = document.createElement("a");
+        link3.href = `http://localhost:8000/static/${Answer_key_filename}`;
+        link3.textContent = "🗝️ View Answer Key";
+        link3.target = "_blank";
+        link3.rel = "noopener noreferrer";
+        link3.style.display = "block";
+        outputDiv.appendChild(link3);
+      }
+
+      if (HTML_filename || PDF_filename || Answer_key_filename) {
+        const downloadLink = document.createElement("a");
+        downloadLink.href = `http://localhost:8000/download_all?pdf_filename=${PDF_filename || ""}&answer_filename=${Answer_key_filename || ""}`;
+        downloadLink.textContent = "⬇️ Download All";
+        downloadLink.target = "_blank";
+        downloadLink.rel = "noopener noreferrer";
+        downloadLink.style.display = "inline-block";
+        downloadLink.style.marginTop = "1em";
+        downloadLink.classList.add("btn", "btn-primary", "mt-3");
+
+        outputDiv.appendChild(downloadLink);
+
+        // Show histogram controls once a worksheet is generated
+        document.getElementById("histogram-btn").style.display = "inline-block";
+        document.getElementById("histogram-card").style.display = "block";
+      }
+    });
+
+    document.getElementById("reset-btn").addEventListener("click", () => {
+      location.reload();
+    });
   });
-
-document.getElementById("topic").addEventListener("change", () => {
-  const outputDiv = document.getElementById("outputDiv");
-  const links = outputDiv.querySelectorAll("a");
-
-  links.forEach(link => outputDiv.removeChild(link));
-});
-
-document.getElementById("reset-btn").addEventListener("click", () => {
-  location.reload();
-});
-
 </script>
 </body>
 </html>
