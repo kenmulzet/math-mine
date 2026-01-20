@@ -1,0 +1,10 @@
+{
+  "difference_equations": {
+    "function": "generate_difference_eqn",
+    "label": "Second Order Difference Equations"
+  },
+  "second_order_differential_equations": {
+    "function": "generate_second_order_eqn",
+    "label": "Second Order Homogeneous Differential Equations"
+  }
+}

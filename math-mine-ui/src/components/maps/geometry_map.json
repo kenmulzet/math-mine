@@ -1,0 +1,42 @@
+{
+  "circle_area": {
+    "function": "generate_circle_area_problem",
+    "label": "Area of a Circle"
+  },
+  "circle_circumference": {
+    "function": "generate_circumference_problem",
+    "label": "Circumference of a Circle"
+  },
+  "square_area": {
+    "function": "generate_square_area_problem",
+    "label": "Area of a Square"
+  },
+  "square_perimeter": {
+    "function": "generate_square_perimeter_problem",
+    "label": "Perimeter of a Square"
+  },
+  "triangle_area": {
+    "function": "generate_triangle_area_problem",
+    "label": "Area of a Triangle"
+  },
+  "cube_volume": {
+    "function": "generate_cube_volume_problem",
+    "label": "Volume of a Cube"
+  },
+  "cube_surface_area": {
+    "function": "generate_cube_surface_area_problem",
+    "label": "Surface Area of a Cube"
+  },
+  "cylinder_volume": {
+    "function": "generate_cylinder_volume_problem",
+    "label": "Volume of a Cylinder"
+  },
+  "cylinder_surface_area": {
+    "function": "generate_cylinder_surface_area_problem",
+    "label": "Surface Area of a Cylinder"
+  },
+  "sphere_volume": {
+    "function": "generate_sphere_volume_problem",
+    "label": "Volume of a Sphere"
+  }
+}

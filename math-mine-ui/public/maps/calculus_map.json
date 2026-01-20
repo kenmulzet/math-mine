@@ -1,0 +1,26 @@
+{
+  "indefinite_integrals": {
+    "function": "generate_indefinite_integral",
+    "label": "Indefinite Integrals"
+  },
+  "definite_integrals": {
+    "function": "generate_definite_integral",
+    "label": "Indefinite Integrals"
+  },
+  "polynomial_derivative": {
+    "function": "generate_polynomial_derivative",
+    "label": "Polynomial Derivatives"
+  },
+  "exponential_derivative": {
+    "function": "generate_exponential_derivative",
+    "label": "Exponential Derivatives"
+  },
+  "exponential_antiderivative": {
+    "function": "generate_exponential_antiderivative",
+    "label": "Exponential Antiderivatives"
+  },
+  "trig_derivative": {
+    "function": "generate_trig_derivative",
+    "label": "Trigonometric Derivatives"
+  }
+}

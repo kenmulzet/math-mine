@@ -1,0 +1,14 @@
+{
+  "linear_equations": {
+    "function": "generate_linear_equation",
+    "label": "Linear Equations"
+  },
+  "quadratic_equations": {
+    "function": "generate_quadratic_equation",
+    "label": "Quadratic Equations"
+  },
+  "quadratic_factors": {
+    "function": "generate_factor_quadratic",
+    "label": "Factoring Quadratics"
+  }
+}
